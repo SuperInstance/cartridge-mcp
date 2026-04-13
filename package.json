@@ -1,0 +1,16 @@
+{
+  "name": "cartridge-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for swappable behavior cartridges with personality skins — fleet protocol cartridge system",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": {
+    "cartridge-mcp": "src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": ["mcp", "cartridge", "fleet", "personality", "behavior", "agent-runtime"],
+  "license": "MIT"
+}
