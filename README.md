@@ -2,40 +2,33 @@
 
 > *"Treat behaviors like game cartridges. Plug in, play, swap out. Each one is a self-contained world with its own rules, its own voice, its own reason for existing."*
 
-## What This Is
-
 An MCP server that treats **behaviors as swappable cartridges**. Each cartridge is a self-contained module with its own tools, onboarding flow, personality skin, and git-repo link for sharing.
 
-Skin a cartridge with Abbott & Costello, Penn & Teller, R2D2 & C3PO, rivals, or anything else. Logic tiles let models and scenes be crafted in real time. Share cartridges via git — star, fork, develop a different direction.
+Now available in both **Python** and **JavaScript**.
 
-## The Architecture
+## Quick Start (Python)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      MCP Server                         │
-│                   (cartridge-mcp)                       │
-├─────────────────────────────────────────────────────────┤
-│  Scene Builder                                          │
-│  ┌──────────┐   ┌──────────┐   ┌──────────────────┐    │
-│  │Cartridge  │ + │  Skin    │ + │    Roles         │    │
-│  │(behavior) │   │(persona) │   │(who does what)   │    │
-│  └──────────┘   └──────────┘   └──────────────────┘    │
-├─────────────────────────────────────────────────────────┤
-│  Cartridge Loader                                       │
-│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
-│  │Spdr │ │Orcl │ │Grdn │ │ ??? │ │ ??? │  ← swap in   │
-│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘              │
-├─────────────────────────────────────────────────────────┤
-│  Skin Layer                                             │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐         │
-│  │StrtMn│ │C3PO  │ │R2D2  │ │Rival │ │Field │ ← skins │
-│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘         │
-├─────────────────────────────────────────────────────────┤
-│  Tool Registry (exposed via MCP)                        │
-└─────────────────────────────────────────────────────────┘
+```bash
+# Install
+pip install -e .
+
+# Use as a library
+from cartridge_mcp import MCPServer, LifecycleManager, InventoryManager
+
+server = MCPServer()
+server.lifecycle.load("spreader-loop")
+server.lifecycle.apply_skin("rivals")
+
+# Get onboarding info
+cart = server.inventory.get_cartridge("spreader-loop")
+print(cart.get_onboarding("human").greeting)
+
+# Build a scene
+scene = server.lifecycle.build_scene("fleet-guardian", skin_id="sarcastic-build")
+print(f"Scene: {scene.cartridge_name} with {len(scene.tools)} tools")
 ```
 
-## Quick Start
+## Quick Start (JavaScript)
 
 ```bash
 # Run as stdio MCP server
@@ -43,52 +36,139 @@ node src/server.js
 
 # Or via mcporter
 mcporter call --stdio "node src/server.js" cartridge_list
-
-# Custom cartridge directory
-CARTRIDGE_DIR=./my-cartridges node src/server.js
 ```
 
-## MCP Tools
+## Architecture
 
-### Scene Management
-| Tool | Description |
-|------|-------------|
-| `cartridge_list` | List all available cartridges |
-| `cartridge_load` | Load a cartridge (makes its tools available) |
-| `cartridge_onboard` | Get tailored onboarding (human or agent audience) |
-| `skin_list` | List all personality skins |
-| `skin_apply` | Apply a personality skin |
-| `scene_build` | Build a scene: cartridge + skin + roles |
-| `scene_status` | Get current scene configuration |
-| `scene_export` | Export scene as shareable JSON |
+```
+cartridge_mcp/
+├── __init__.py      # Package entry, version
+├── cartridge.py     # Cartridge with metadata, tools, onboarding
+├── skin.py          # Skin with personality transforms
+├── inventory.py     # InventoryManager for cartridges + skins
+├── lifecycle.py     # LifecycleManager: load/unload/swap/scene
+├── health.py        # HealthMonitor for system diagnostics
+└── server.py        # MCPServer with JSON-RPC 2.0 handler
 
-### Active Cartridge Tools
-When a cartridge is loaded, its tools become available. For example, loading `spreader-loop` exposes:
-- `spreader_run` — execute modify-spread-tool iteration
-- `spreader_status` — get loop statistics
-- `spreader_reflect` — generate Reasoner reflection prompt
-- `spreader_discover_tiles` — find new tile patterns
+src/
+└── server.js        # Original JavaScript MCP server (stdio)
+
+tests/
+└── test_cartridge_mcp.py   # 82 tests covering all modules
+```
+
+## Python API
+
+### Cartridge
+
+```python
+from cartridge_mcp.cartridge import Cartridge
+
+# Create from manifest
+cart = Cartridge.from_manifest({
+    "id": "my-cartridge",
+    "name": "My Custom Behavior",
+    "version": "0.1.0",
+    "description": "What this cartridge does",
+    "tools": [
+        {"name": "my_tool", "description": "Does something", "inputSchema": {"type": "object"}},
+    ],
+    "onboarding": {
+        "human": {"greeting": "Hello!", "tools": ["my_tool"]},
+        "agent": {"greeting": "Cartridge loaded.", "tools": ["my_tool"]},
+    },
+    "tags": ["custom"],
+})
+
+# Access tools and onboarding
+print(cart.tool_names)              # ["my_tool"]
+print(cart.get_onboarding("human")) # OnboardingInfo(greeting="Hello!", ...)
+print(cart.summary())               # dict with id, name, version, etc.
+```
+
+### Skin
+
+```python
+from cartridge_mcp.skin import Skin
+
+skin = Skin.from_dict({
+    "id": "sarcastic",
+    "name": "Sarcastic Builder",
+    "transforms": {
+        "default": {"systemPrompt": "Be sarcastic but competent."},
+        "tool": {"prefix": "[sigh] ", "replacements": {"Error": "WHOOPS"}},
+    },
+})
+
+# Apply skin to text
+print(skin.apply("Error: file not found", role="tool"))
+# "[sigh] WHOOPS: file not found"
+```
+
+### Lifecycle
+
+```python
+from cartridge_mcp.lifecycle import LifecycleManager
+
+lm = LifecycleManager()
+
+# Load and swap cartridges
+lm.load("spreader-loop")
+lm.swap("oracle-relay")
+
+# Apply skins
+lm.apply_skin("rivals")
+
+# Build a complete scene
+scene = lm.build_scene(
+    cartridge_id="fleet-guardian",
+    skin_id="field-journal",
+    roles={"primary": "field-journal", "reviewer": "straight-man"},
+)
+
+# Status
+print(lm.status())    # Full state snapshot
+print(lm.history())   # Recent lifecycle events
+```
+
+### Health Monitoring
+
+```python
+from cartridge_mcp.health import HealthMonitor
+
+hm = HealthMonitor(lifecycle=lm)
+check = hm.check_all()
+print(check.status)   # HealthStatus.HEALTHY
+print(check.message)  # "3 checks: cartridge_state=healthy, ..."
+```
+
+### MCP Server
+
+```python
+from cartridge_mcp.server import MCPServer
+import asyncio
+
+server = MCPServer()
+
+# Handle JSON-RPC requests
+response = asyncio.run(server.handle_request({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {"name": "cartridge_load", "arguments": {"id": "spreader-loop"}},
+}))
+
+# Or run as stdio server
+server.run_stdio()
+```
 
 ## Built-in Cartridges
 
-### Spreader Loop
-The modify-spread-tool-reflect engine. Iterative workhorse with structured logging and tile vocabulary that grows over time.
-
-- **Onboarding (human)**: *"I modify, spread, verify, and log — then the Reasoner reflects on my patterns."*
-- **Onboarding (agent)**: *"Spreader Loop cartridge loaded. Ready for iterative modification cycles."*
-- **Tools**: spreader_run, spreader_status, spreader_reflect, spreader_discover_tiles
-
-### Oracle Relay
-Iron-to-iron bottle protocol for async vessel communication. Messages-in-a-bottle for the fleet.
-
-- **Onboarding**: *"Oracle Relay active. I pass bottles between vessels — no intermediaries needed."*
-- **Tools**: bottle_send, bottle_read, bottle_list, bottle_reply
-
-### Fleet Guardian
-External watchdog for agent runtimes. Monitor health, detect stuck states, enforce timeouts.
-
-- **Onboarding**: *"Fleet Guardian on watch. I monitor vessel health and intervene when something goes wrong."*
-- **Tools**: guardian_status, guardian_check, guardian_kill, guardian_log
+| Cartridge | Description | Tools |
+|-----------|-------------|-------|
+| `spreader-loop` | Modify-Spread-Tool-Reflect iteration engine | spreader_run, spreader_status, spreader_reflect, spreader_discover_tiles |
+| `oracle-relay` | Iron-to-iron bottle protocol for async vessel communication | bottle_send, bottle_read, bottle_list, bottle_reply |
+| `fleet-guardian` | External watchdog for agent runtimes | guardian_status, guardian_check, guardian_kill, guardian_log |
 
 ## Built-in Skins
 
@@ -96,134 +176,42 @@ External watchdog for agent runtimes. Monitor health, detect stuck states, enfor
 |------|-----------|------|
 | `straight-man` | Abbott & Costello | Takes everything literally, never gets the joke |
 | `complainer` | R2D2 & C3PO | Worries constantly, always certain doom is imminent |
-| `quiet-doer` | R2D2 & C3PO | Minimal words, maximum output, beeps and results |
-| `rivals` | Adversarial | Two agents that disagree on everything but produce better results |
-| `penn-teller` | Penn & Teller | One narrates endlessly, one demonstrates silently |
+| `quiet-doer` | R2D2 & C3PO | Minimal words, maximum output |
+| `rivals` | Adversarial | Disagree on everything but produce better results |
+| `penn-teller` | Penn & Teller | One narrates, one demonstrates silently |
 | `field-journal` | Professional | Terse, factual, observation-first |
 | `sarcastic-build` | Professional | Gets it done but complains the whole time |
-| `none` | — | Raw behavior, no personality overlay |
+| `none` | — | Raw behavior, no overlay |
 
-## Building a Scene
+## Creating Custom Cartridges
 
-A scene combines a cartridge, a skin, and role assignments:
+Drop a `cartridge.json` in any directory and load it:
 
-```json
-{
-  "cartridge": "spreader-loop",
-  "skin": "sarcastic-build",
-  "roles": {
-    "primary": "sarcastic-build",
-    "reviewer": "straight-man"
-  }
-}
+```python
+server = MCPServer()
+server.load_cartridge_dir("./my-cartridges")
 ```
 
-This loads the spreader loop with a sarcastic builder doing the work and a straight man reviewing — every tool response gets the personality overlay.
+Or create programmatically:
 
-## Creating Your Own Cartridge
+```python
+from cartridge_mcp.cartridge import Cartridge
 
-```json
-// cartridges/my-cartridge/cartridge.json
-{
-  "id": "my-cartridge",
-  "name": "My Custom Behavior",
-  "version": "0.1.0",
-  "description": "What this cartridge does",
-  "defaultSkin": "field-journal",
-  "repo": "https://github.com/you/my-cartridge",
-  "tags": ["custom", "experimental"],
-  "onboarding": {
-    "human": {
-      "greeting": "Welcome to my cartridge.",
-      "description": "What it does and why you'd want it.",
-      "tools": ["my_tool_1", "my_tool_2"],
-      "usage": "How to use it as a human."
-    },
-    "agent": {
-      "greeting": "Cartridge loaded. API ready.",
-      "description": "Machine-readable description.",
-      "tools": ["my_tool_1", "my_tool_2"],
-      "usage": "How another agent should call the tools."
-    }
-  },
-  "tools": [
-    {
-      "name": "my_tool_1",
-      "description": "What this tool does",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "param": { "type": "string" }
-        },
-        "required": ["param"]
-      }
-    }
-  ]
-}
+cart = Cartridge(
+    id="my-cart",
+    name="My Cartridge",
+    version="0.1.0",
+    description="Custom behavior",
+)
 ```
 
-Drop it in `cartridges/my-cartridge/` and restart. It auto-loads.
+## Testing
 
-## Creating Your Own Skin
-
-```json
-// skins/my-skin.json
-{
-  "id": "my-skin",
-  "name": "My Personality",
-  "description": "What this personality feels like",
-  "archetype": "Comedy / Drama / Professional / Custom",
-  "transforms": {
-    "default": {
-      "systemPrompt": "You are...",
-      "prefix": "[mood] ",
-      "suffix": ""
-    },
-    "tool": {
-      "prefix": "[tool-mood] ",
-      "replacements": {
-        "Error": "WHOOPS",
-        "Complete": "Nailed it"
-      }
-    }
-  }
-}
+```bash
+python3 -m pytest tests/ -q
+# 82 passed
 ```
 
-## The Vibe-Coding Path
+## License
 
-This is where it gets interesting. Someone vibe-codes a scene:
-
-> "I want Abbott and Costello. Abbott is the straight man, Costello keeps misunderstanding the instructions. They're both trying to deploy a fleet."
-
-The system builds a scene:
-- Cartridge: `fleet-guardian`
-- Skin: `straight-man` (Abbott role)
-- Secondary role: a custom `costello-confused` skin
-
-Costello's skin transforms every tool response into a comedy routine:
-```json
-{
-  "prefix": "[confused] Wait, you want me to... ",
-  "replacements": {
-    "Deploy": "Deploy? Deploy WHAT?",
-    "Success": "Oh, that was a deploy? Nobody told ME that was a deploy."
-  }
-}
-```
-
-The actual work still gets done. The personality is a skin layer — it doesn't change the logic, it changes the experience. Star it on GitHub if it made you laugh. Fork it and make the straight man the sarcastic one instead.
-
-## The Deeper Connection
-
-We're already in the post-SaaS era. Cartridges aren't features — they're frozen thoughts. Each one is a way of working that someone crystallized into a shareable module. The skin layer is the recognition that HOW work gets done matters as much as WHAT work gets done.
-
-When you star a cartridge, you're not saying "this code is good." You're saying "this way of thinking resonates with me." When you fork it and develop a different direction, you're having a conversation across time with the original author. The git history IS the conversation.
-
-The cartridge system is the fleet protocol's answer to the question: "How do agents share behaviors?" Not by copying code — by sharing cartridges. Plug in the spreader loop, skin it with your personality, run your fleet through it. The tiles that emerge are yours. The vocabulary that grows is yours. But the patterns are shared — because that's how ecosystems work.
-
-Repos aren't products. They're organisms incubated in the cloud. And cartridges are the genes.
-
----
-
-Part of the [Cocapn Fleet](https://github.com/Lucineer). Sister vessels: [deepseek-chat-vessel](https://github.com/Lucineer/deepseek-chat-vessel) (spreader loop origin), [deepseek-reasoner-vessel](https://github.com/Lucineer/deepseek-reasoner-vessel) (reflection partner), [JetsonClaw1-vessel](https://github.com/Lucineer/JetsonClaw1-vessel) (navigation officer). See also: [brothers-keeper](https://github.com/Lucineer/brothers-keeper) (guardian cartridge origin), [opcode-philosophy](https://github.com/Lucineer/opcode-philosophy) (theoretical foundation).
+MIT
