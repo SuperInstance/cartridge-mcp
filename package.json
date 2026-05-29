@@ -1,7 +1,7 @@
 {
   "name": "cartridge-mcp",
   "version": "0.1.0",
-  "description": "MCP server for swappable behavior cartridges with personality skins — fleet protocol cartridge system",
+  "description": "MCP server for swappable behavior cartridges with personality skins \u2014 fleet protocol cartridge system",
   "type": "module",
   "main": "src/server.js",
   "bin": {
@@ -9,8 +9,19 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "vitest run"
   },
-  "keywords": ["mcp", "cartridge", "fleet", "personality", "behavior", "agent-runtime"],
-  "license": "MIT"
+  "keywords": [
+    "mcp",
+    "cartridge",
+    "fleet",
+    "personality",
+    "behavior",
+    "agent-runtime"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^4.1.7"
+  }
 }
